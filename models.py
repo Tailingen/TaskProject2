@@ -14,7 +14,3 @@ class TaskModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     text: Mapped[str]
     status: Mapped[bool]
-
-async def main():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)

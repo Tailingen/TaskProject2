@@ -1,36 +1,45 @@
 from fastapi import APIRouter
+from sqlalchemy import insert, update, delete, select
 
+from models import engine, TaskModel
 from tasks.schemas import TaskAddSchema
 
-router = APIRouter()
+router = APIRouter(prefix="/tasks", tags=["tasks", ])
 
-db_immitation = [
-    {"id": 1, "text": "Подоить корову", "status": False},
-    {"id": 2, "text": "Погулять с собакой", "status": False}
-]
-
-@router.get("/tasks/{task_id}/")
+@router.get("/{task_id}/")
 async def task(task_id: int):
-    if 0 < int(task_id) <= len(db_immitation):
-        return db_immitation[task_id-1]["text"]
-    else:
-        return "Запись не найдена"
+    async with engine.connect() as conn:
+        query = select(TaskModel).filter_by(id=task_id)
+        res = await conn.execute(query)
+    return list(res.first())
 
-@router.get("/tasks/")
+@router.get("/")
 async def tasks():
-    return db_immitation
+    async with engine.connect() as conn:
+        query = select(TaskModel)
+        res = await conn.execute(query)
+    return [list(i) for i in res.all()]
 
-@router.post("/tasks/create/")
+@router.post("/create/")
 async def task_create(schema: TaskAddSchema):
-    db_immitation.append({"id": len(db_immitation)+1, "text": schema.text, "status": schema.status})
-    return db_immitation[-1]
+    async with engine.connect() as conn:
+        query = insert(TaskModel).values(text=schema.text, status=schema.status)
+        await conn.execute(query)
+        await conn.commit()
+    return schema
 
-@router.put("/tasks/{task_id}/update/")
+@router.put("/{task_id}/update/")
 async def task_update(task_id: int, schema: TaskAddSchema):
-    db_immitation[task_id-1] = {"id": task_id, "text": schema.text, "status": schema.status}
-    return db_immitation[task_id-1]
+    async with engine.connect() as conn:
+        query = update(TaskModel).filter_by(id=task_id).values(text=schema.text, status=schema.status)
+        await conn.execute(query)
+        await conn.commit()
+    return schema
 
-@router.delete("/tasks/{task_id}/delete/")
+@router.delete("/{task_id}/delete/")
 async def task_delete(task_id: int):
-    res = db_immitation.pop(task_id-1)
-    return res
+    async with engine.connect() as conn:
+        query = delete(TaskModel).filter_by(id=task_id)
+        await conn.execute(query)
+        await conn.commit()
+    return {"detail": "Запись успешно удалена"}
